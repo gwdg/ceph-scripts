@@ -196,7 +196,7 @@ def check_disk(device):
 def main_badblocks(args):
 
     # Create log dir for badblocks
-    mkdir(LOG_DIR)
+    mkdir(LOG_DIR + '/badblocks')
 
     pool = ThreadPool(THREADS)
 
