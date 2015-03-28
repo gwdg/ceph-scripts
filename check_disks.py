@@ -103,13 +103,14 @@ def run_command_and_block(arguments, **kwargs):
     out, _ = process.communicate()
     return out, process.returncode
 
-def run_command_background(arguments, **kwargs):
+def run_command_background(arguments, log_file, **kwargs):
     
     arguments = _get_command_executable(arguments)
     LOG.info('Running command: %s' % ' '.join(arguments))
     process = subprocess.Popen(
         arguments,
-        stdout=subprocess.PIPE,
+        stdout = log_file,
+        stderr = subprocess.STDOUT,
         **kwargs)
     return process
 
@@ -163,7 +164,7 @@ def mkdir(*a, **kw):
 DEVICES = '^(ata-HDS)|(ata-ST3000)'
 DEVICES_PATH = '/dev/disk/by-id'
 
-LOG_DIR = '/tmp/badblocks'
+LOG_DIR = '/tmp'
 
 THREADS = 30
 
@@ -176,14 +177,20 @@ def check_disk(device):
 
 #    if not stat.S_ISBLK(os.lstat(device).st_mode):
 #        raise Error('not a block device', device)
-    
-    log_file = LOG_DIR + '/' + device + '.txt'
-    LOG.debug('Using log file for badblocks data: %s', log_file)
+
+    file_name = LOG_DIR + '/badblocks/' + device
+
+    badblocks_file = file_name + '.badblocks'
+    LOG.debug('Using file for badblocks data: %s', badblocks_file)
+
+    log_file_name = file_name + '.log'
+    log_file = open(log_file_name, 'w')
+    LOG.debug('Using log file for badblocks command: %s', log_file_name)
 
     badblocks_call = BADBLOCKS_CALL[:]
-    badblocks_call.extend(['-o', log_file, device_path])
+    badblocks_call.extend(['-o', badblocks_file, device_path])
 
-    process = run_command_background(badblocks_call)
+    process = run_command_background(badblocks_call, log_file)
     processes.append(process)
 
     out, _ = process.communicate()
