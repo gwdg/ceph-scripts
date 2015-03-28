@@ -21,25 +21,6 @@ import argparse
 from multiprocessing.dummy import Pool as ThreadPool
 from Queue import PriorityQueue
 
-# Initialize logging
-
-# Create logger
-LOG = logging.getLogger('check_disks')
-LOG.setLevel(logging.DEBUG)
-
-# Create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
-# Create formatter
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
-
-# Add formatter to ch
-ch.setFormatter(formatter)
-
-# Add ch to logger
-LOG.addHandler(ch)
-
 ###### exceptions ########
 
 class Error(Exception):
