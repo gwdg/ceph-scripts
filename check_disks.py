@@ -16,6 +16,8 @@ import platform
 import re
 import subprocess
 import atexit
+import argparse
+
 from multiprocessing.dummy import Pool as ThreadPool
 from Queue import PriorityQueue
 
