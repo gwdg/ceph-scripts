@@ -161,6 +161,17 @@ def mkdir(*a, **kw):
 
 # ---------- Own util stuff
 
+
+
+
+processes = []
+
+@atexit.register
+def kill_subprocesses():
+    for process in processes:
+        process.kill()
+
+
 DEVICES = '^(ata-HDS)|(ata-ST3000)'
 DEVICES_PATH = '/dev/disk/by-id'
 
@@ -197,35 +208,136 @@ def check_disk(device):
 
     processes.remove(process)
 
-# Create log dir for badblocks
-mkdir(LOG_DIR)
+# ------ Main
 
-pool = ThreadPool(THREADS)
+def main_badblocks(args):
 
-# Create a list of devices to run badblocks on
-devices = []
-for device in os.listdir(DEVICES_PATH):
-    # Ignore partitions
-    if re.match(r'.*-part[0-9]+$', device):
-        LOG.debug('Ignoring partition: %s', device)
-        continue
-    if re.match(r'%s' % DEVICES, device):
-        LOG.info('Adding device to list: %s', device)
-        devices.append(device)
+    # Create log dir for badblocks
+    mkdir(LOG_DIR)
 
-processes = []
+    pool = ThreadPool(THREADS)
 
-@atexit.register
-def kill_subprocesses():
-    for process in processes:
-        process.kill()
+    # Create a list of devices to run badblocks on
+    devices = []
+    for device in os.listdir(DEVICES_PATH):
+        # Ignore partitions
+        if re.match(r'.*-part[0-9]+$', device):
+            LOG.debug('Ignoring partition: %s', device)
+            continue
+        # Match devices
+        if re.match(r'%s' % DEVICES, device):
+            LOG.info('Adding device to list: %s', device)
+            devices.append(device)
 
-try:
-    results = pool.map(check_disk, devices)
-except KeyboardInterrupt:
-    kill_subprocesses()
-    sys.exit()
+    try:
+        results = pool.map(check_disk, devices)
 
-pool.close() 
-pool.join() 
+    except KeyboardInterrupt:
+        kill_subprocesses()
+        sys.exit()
+
+    pool.close()
+    pool.join()
+    
+
+def parse_args():
+ 
+    # Global arguments
+
+    parser = argparse.ArgumentParser(
+        'check_disks.py', )
+
+    parser.add_argument(
+        '-v', '--verbose',
+        action  = 'store_true', default = None,
+        help    = 'be more verbose', )
+
+    parser.add_argument(
+        '--logdir',
+        metavar = 'PATH',
+        default = '/tmp',
+        help    = 'write log / output files to this dir (default /tmp)', )
+ 
+    parser.set_defaults(
+        # we want to hold on to this, for later
+        prog=parser.prog,
+#        cluster='ceph',
+        )
+
+    subparsers = parser.add_subparsers(
+        title='subcommands',
+        description='valid subcommands',
+        help='sub-command help',
+        )
+
+    # badblocks related arguments
+
+    badblocks_parser = subparsers.add_parser('badblocks', help='Run badblocks for selection of disks')
+
+    badblocks_parser.add_argument(
+        '--cluster',
+        metavar='NAME',
+        help='cluster name to assign this disk to',)
+
+    badblocks_parser.set_defaults(
+        func=main_badblocks,
+    )
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+
+    args = parse_args()
+
+    loglevel = logging.INFO
+    if args.verbose:
+        loglevel = logging.DEBUG
+
+    # Initialize logging
+
+    LOG = logging.getLogger(os.path.basename(sys.argv[0]))
+    LOG.setLevel(loglevel)
+
+    # Create console handler and set level to debug
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+    ch.setFormatter(formatter)
+
+    LOG.addHandler(ch)
+
+
+#    if args.prepend_to_path != '':
+#        path = os.environ.get('PATH', os.defpath)
+#        os.environ['PATH'] = args.prepend_to_path + ":" + path
+
+    try:
+        args.func(args)
+
+    except Error as e:
+        raise SystemExit(
+            '{prog}: {msg}'.format(
+                prog=args.prog,
+                msg=e,
+            )
+        )
+
+#    except CephDiskException as error:
+#        exc_name = error.__class__.__name__
+#        raise SystemExit(
+#            '{prog} {exc_name}: {msg}'.format(
+#                prog=args.prog,
+#                exc_name=exc_name,
+#                msg=error,
+#            )
+#        )
+
+
+if __name__ == '__main__':
+    main()
+
 
