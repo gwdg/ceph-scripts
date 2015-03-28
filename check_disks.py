@@ -21,6 +21,8 @@ import argparse
 from multiprocessing.dummy import Pool as ThreadPool
 from Queue import PriorityQueue
 
+LOG = logging.getLogger(os.path.basename(sys.argv[0]))
+
 ###### exceptions ########
 
 class Error(Exception):
@@ -280,7 +282,7 @@ def main():
 
     # Initialize logging
 
-    LOG = logging.getLogger(os.path.basename(sys.argv[0]))
+#    LOG = logging.getLogger(os.path.basename(sys.argv[0]))
     LOG.setLevel(loglevel)
 
     # Create console handler and set level to debug
