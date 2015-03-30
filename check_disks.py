@@ -193,6 +193,10 @@ def check_disk(device):
 
 # ------ Main
 
+def main_debug(args):
+
+    LOG.info('Running debug...')
+
 def main_badblocks(args):
 
     # Create log dir for badblocks
@@ -244,27 +248,36 @@ def parse_args():
     parser.set_defaults(
         # we want to hold on to this, for later
         prog=parser.prog,
-#        cluster='ceph',
-        )
+#        cluster='ceph', )
 
     subparsers = parser.add_subparsers(
         title='subcommands',
         description='valid subcommands',
-        help='sub-command help',
-        )
+        help='sub-command help', )
 
     # badblocks related arguments
 
     badblocks_parser = subparsers.add_parser('badblocks', help='Run badblocks for selection of disks')
 
-    badblocks_parser.add_argument(
-        '--cluster',
-        metavar='NAME',
-        help='cluster name to assign this disk to',)
+#    badblocks_parser.add_argument(
+#        '--cluster',
+#        metavar='NAME',
+#        help='cluster name to assign this disk to',)
 
     badblocks_parser.set_defaults(
-        func=main_badblocks,
-    )
+        func=main_badblocks, )
+
+    # debug related arguments
+
+    debug_parser = subparsers.add_parser('debug', help='Run debug')
+
+#    debug_parser.add_argument(
+#        '--cluster',
+#        metavar='NAME',
+#        help='cluster name to assign this disk to',)
+
+    badblocks_parser.set_defaults(
+        func=main_debug, )
 
     args = parser.parse_args()
     return args
