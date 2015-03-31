@@ -78,34 +78,43 @@ def _get_command_executable(arguments):
     return arguments
 
 
-def run_command_and_block(arguments, **kwargs):
+def run_command_and_block(arguments, args, **kwargs):
 
     arguments = _get_command_executable(arguments)
     LOG.info('Running command: %s' % ' '.join(arguments))
-    process = subprocess.Popen(
-        arguments,
-        stdout=subprocess.PIPE,
-        **kwargs)
-    out, _ = process.communicate()
-    return out, process.returncode
+    if not args.dry_run:
+        process = subprocess.Popen(
+            arguments,
+            stdout = subprocess.PIPE,
+            **kwargs)
+        stdout, stderr = process.communicate()
+        return stdout, process.returncode
+    else:
+        # Return fake data
+        return '', 0
 
-def run_command_background(arguments, log_file, **kwargs):
+def run_command_background(arguments, args, log_file, **kwargs):
     
     arguments = _get_command_executable(arguments)
     LOG.info('Running command: %s' % ' '.join(arguments))
-    process = subprocess.Popen(
-        arguments,
-        stdout = log_file,
-        stderr = subprocess.STDOUT,
-        **kwargs)
-    return process
+    if not args.dry_run:
+        process = subprocess.Popen(
+            arguments,
+            stdout = log_file,
+            stderr = subprocess.STDOUT,
+            **kwargs)
+        return process
+    else:
+        return None
 
-def command_check_call(arguments):
+def command_check_call(arguments, args):
 
     arguments = _get_command_executable(arguments)
     LOG.info('Running command: %s', ' '.join(arguments))
-    return subprocess.check_call(arguments)
-
+    if not args.dry_run:
+        return subprocess.check_call(arguments)
+    else:
+        return 0
 
 def get_dev_size(dev, size='megabytes'):
     """
@@ -493,10 +502,6 @@ def main_ceph_deploy_osd_prepare(args):
         ceph_deploy_call.extend([osd_location])
 
         process = command_check_call(ceph_deploy_call)
-        
-         
-
-
 
 def main_badblocks(args):
 
@@ -538,6 +543,11 @@ def parse_args():
         metavar = 'PATH',
         default = '/tmp',
         help    = 'write log / output files to this dir (default /tmp)', )
+
+    parser.add_argument(
+        '--dry-run',
+        default = False,
+        help    = 'Do not modify system state, just print commands to be run (default false)', )
 
     parser.add_argument(
         '--disks-by-id',
