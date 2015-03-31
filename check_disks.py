@@ -447,7 +447,7 @@ def main_debug(args):
 
     LOG.info('Running debug...')
 
-    # Create a list of selected devices
+    # Get the list of selected devices
     devices_by_id = select_devices(args)
 
     # Dump selected disks
@@ -455,12 +455,57 @@ def main_debug(args):
     for device in devices_by_id:
         LOG.info('- %s', device)
 
+CEPH_DEPLOY_OSD_PREPARE_CALL = [ 'ceph-deploy', 'osd', 'prepare' ]
+
+def main_ceph_deploy_osd_prepare(args):
+
+    LOG.info('Running ceph deploy osd prepare...')
+
+    # Get the list of selected devices
+    devices_by_id = select_devices(args)
+
+    # Get list of journal devices to use
+    journal_devices = str.split(',', args.journal_devices)
+    LOG.info('Using "%s" as journal devices to create partitions on', pprint.pformat(journal_devices))
+
+    # Create array to hold number of partitions for each device to select the least used journal device for the next osd
+    journal_devices_partitions = []
+    for i in range(0, len(journal_devices)):
+        device_base_name = get_dev_name(journal_devices[i])
+        partitions = list_partitions(device_base_name)
+        journal_devices_partitions[i] = len(partitions)
+        LOG.debug('Current number of partitions on journal device "%s": %i', device_base_name, len(partitions))
+
+    # For each selected disk determine the least used journal device and use that in 'ceph-deploy prepare disk' call
+    for osd_device in devices_by_id:
+        
+        # Find least used journal device from list
+        best = 0
+        for i in range(0, len(journal_devices)):
+            if journal_devices_partitions[i] < journal_devices_partitions[best]:
+                best = i
+        LOG.debug('Using journal device "%s" for osd device "%s"', journal_devices[best], device)
+
+        osd_location = args.host + ':/' + device + ':' + journal_devices[best]
+
+        # Run 'ceph-deploy osd prepare'
+        ceph_deploy_call = CEPH_DEPLOY_OSD_PREPARE_CALL[:]
+        ceph_deploy_call.extend([osd_location])
+
+        process = command_check_call(ceph_deploy_call)
+        
+         
+
+
+
 def main_badblocks(args):
+
+     LOG.info('Running badblocks...')
 
     # Create log dir for badblocks
     mkdir(LOG_DIR + '/badblocks')
 
-    # Create a list of devices to run badblocks on
+    # Get the list of devices to run badblocks on
     devices_by_id = select_devices(args)
 
     pool = ThreadPool(THREADS)
@@ -561,6 +606,23 @@ def parse_args():
 
     debug_parser.set_defaults(
         function=main_debug, )
+
+    # ceph-deploy related arguments
+
+    ceph_deploy_osd_prepare_parser = subparsers.add_parser('ceph-deploy-osd-prepare', help='Run "ceph-deploy osd prepare" on selected disks')
+
+    ceph_deploy_osd_prepare_parser.add_argument(
+        '--host',
+        metavar = 'HOST',
+        help    = 'Host to run ceph-deploy on', )
+
+    ceph_deploy_osd_prepare_parser.add_argument( 
+        '--journal-devices',
+        metavar = 'DEVICE1, DEVICE2, ...',
+        help    = 'List of block device to create journal partitions on (will be used round robin)', )
+
+    ceph_deploy_osd_prepare_parser.set_defaults(
+        function=main_ceph_deploy_osd_prepare, )
 
     args = parser.parse_args()
 
