@@ -478,7 +478,7 @@ def main_ceph_deploy_osd_prepare(args):
     LOG.info('Using "%s" as journal devices to create partitions on', pprint.pformat(journal_devices))
 
     # Create array to hold number of partitions for each device to select the least used journal device for the next osd
-    journal_devices_partitions = []
+    journal_devices_partitions = [None] * len(journal_devices)
     for i in range(0, len(journal_devices)):
         device_base_name = get_dev_name(journal_devices[i])
         partitions = list_partitions(device_base_name)
@@ -493,9 +493,9 @@ def main_ceph_deploy_osd_prepare(args):
         for i in range(0, len(journal_devices)):
             if journal_devices_partitions[i] < journal_devices_partitions[best]:
                 best = i
-        LOG.debug('Using journal device "%s" for osd device "%s"', journal_devices[best], device)
+        LOG.debug('Using journal device "%s" for osd device "%s"', journal_devices[best], osd_device)
 
-        osd_location = args.host + ':/' + device + ':' + journal_devices[best]
+        osd_location = args.host + ':/' + osd_device + ':' + journal_devices[best]
 
         # Run 'ceph-deploy osd prepare'
         ceph_deploy_call = CEPH_DEPLOY_OSD_PREPARE_CALL[:]
