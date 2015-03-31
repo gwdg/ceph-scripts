@@ -474,7 +474,7 @@ def main_ceph_deploy_osd_prepare(args):
     devices_by_id = select_devices(args)
 
     # Get list of journal devices to use
-    journal_devices = str.split(',', args.journal_devices)
+    journal_devices = str.split(args.journal_devices, ',')
     LOG.info('Using "%s" as journal devices to create partitions on', pprint.pformat(journal_devices))
 
     # Create array to hold number of partitions for each device to select the least used journal device for the next osd
