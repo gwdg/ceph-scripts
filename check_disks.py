@@ -144,6 +144,127 @@ def mkdir(*a, **kw):
         else:
             raise
 
+def get_dev_name(path):
+    """
+    get device name from path.  e.g.::
+
+        /dev/sda -> sdas, /dev/cciss/c0d1 -> cciss!c0d1
+
+    a device "name" is something like::
+
+        sdb
+        cciss!c0d1
+
+    """
+    assert path.startswith('/dev/')
+    base = path[5:]
+    return base.replace('/', '!')
+
+def is_mounted(dev):
+    """
+    Check if the given device is mounted.
+    """
+    dev = os.path.realpath(dev)
+    with file('/proc/mounts', 'rb') as proc_mounts:
+        for line in proc_mounts:
+            fields = line.split()
+            if len(fields) < 3:
+                continue
+            mounts_dev = fields[0]
+            path = fields[1]
+            if mounts_dev.startswith('/') and os.path.exists(mounts_dev):
+                mounts_dev = os.path.realpath(mounts_dev)
+                if mounts_dev == dev:
+                    return path
+    return None
+
+def is_held(dev):
+    """
+    Check if a device is held by another device (e.g., a dm-crypt mapping)
+    """
+    assert os.path.exists(dev)
+    dev = os.path.realpath(dev)
+    base = get_dev_name(dev)
+
+    # full disk?
+    directory = '/sys/block/{base}/holders'.format(base=base)
+    if os.path.exists(directory):
+        return os.listdir(directory)
+
+    # partition?
+    part = base
+    while len(base):
+        directory = '/sys/block/{base}/{part}/holders'.format(part=part, base=base)
+        if os.path.exists(directory):
+            return os.listdir(directory)
+        base = base[:-1]
+    return []
+
+def get_dev_path(name):
+    """
+    get a path (/dev/...) from a name (cciss!c0d1)
+    a device "path" is something like::
+
+        /dev/sdb
+        /dev/cciss/c0d1
+
+    """
+    return '/dev/' + name.replace('!', '/')
+
+def list_partitions(basename):
+    """
+    Return a list of partitions on the given device name
+    """
+    partitions = []
+    for name in os.listdir(os.path.join('/sys/block', basename)):
+        if name.startswith(basename):
+            partitions.append(name)
+    return partitions
+
+def is_partition(dev):
+    """
+    Check whether a given device path is a partition or a full disk.
+    """
+    dev = os.path.realpath(dev)
+    if not stat.S_ISBLK(os.lstat(dev).st_mode):
+        raise Error('not a block device', dev)
+
+    name = get_dev_name(dev)
+    if os.path.exists(os.path.join('/sys/block', name)):
+        return False
+
+    # make sure it is a partition of something else
+    for basename in os.listdir('/sys/block'):
+        if os.path.exists(os.path.join('/sys/block', basename, name)):
+            return True
+
+    raise Error('not a disk or partition', dev)
+
+def device_not_in_use(dev, check_partitions = True):
+    """
+    Verify if a given device (path) is in use (e.g. mounted or
+    in use by device-mapper).
+    """
+    assert os.path.exists(dev)
+
+    if is_mounted(dev):
+        return False
+    holders = is_held(dev)
+
+    if holders:
+        return False
+
+    if check_partitions and not is_partition(dev):
+        basename = get_dev_name(os.path.realpath(dev))
+        for partname in list_partitions(basename):
+            partition = get_dev_path(partname)
+            if is_mounted(partition):
+                return False
+            holders = is_held(partition)
+            if holders:
+                return False
+
+    return True
 
 # ---------- Own util stuff
 
@@ -168,7 +289,7 @@ THREADS = 30
 
 BADBLOCKS_CALL = [ 'badblocks', '-b', '4096', '-v', '-w']
 
-def select_devices(args):
+def select_devices(args, remove_in_use = True):
 
     # List of selected devices referencing devices in /dev directly
     devices         = []
@@ -247,7 +368,12 @@ def select_devices(args):
  
     # Translate devices into by-id format (absolute path included)
     for device in devices:
-        devices_by_id.append('/dev/disk/by-id/' + dev_to_by_id_map[device])
+        if remove_in_use:
+            if device_not_in_use(device):
+                devices_by_id.append('/dev/disk/by-id/' + dev_to_by_id_map[device])
+            else:
+                # Do not consider devices which are currently in use
+                LOG.debug('Ignoring device "%s" as it is currently is use', dev_to_by_id_map[device])
 
     return devices_by_id
 
