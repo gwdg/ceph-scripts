@@ -282,8 +282,9 @@ def device_is_ssd(dev):
        raise Error('Could not check if device "%s" is a ssd: path "%s" does not exist!', dev, sys_path)
 
     # Get info from sysfs
-    rotational_raw = open(sys_path).read()
+    rotational_raw = open(sys_path).read().rstrip('\n')
 
+#    LOG.debug('Rotational status for device "%s": "%s"', dev, rotational_raw)
     if rotational_raw == '1':
         return False
     else:
@@ -385,20 +386,31 @@ def select_devices(args, remove_in_use = True):
             LOG.debug("Mapping device '%s' to '%s'", device, by_id_to_dev_map[device])
 
     # Create inverse map
-    pp = pprint.PrettyPrinter(indent=4)
-    LOG.debug('by_id_to_dev_map: %s', pp.pprint(by_id_to_dev_map))
+#    pp = pprint.PrettyPrinter(indent=4)
+    LOG.debug('by_id_to_dev_map: %s', pprint.pformat(by_id_to_dev_map))
 
     dev_to_by_id_map = {v: k for k, v in by_id_to_dev_map.items()}
-    LOG.debug('dev_to_by_id_map: %s', pp.pprint(dev_to_by_id_map))
+    LOG.debug('dev_to_by_id_map: %s', pprint.pformat(dev_to_by_id_map))
  
     # Translate devices into by-id format (absolute path included)
     for device in devices:
+
+        device_by_id = dev_to_by_id_map[device]
+
+        if args.disks_only_rotational and not device_is_rotational(device):
+            LOG.debug('Ignoring device "%s" as it is not rotational and --disks-only-rotational=true', device_by_id)
+            continue
+
+        if args.disks_only_ssds and not device_is_ssd(device):
+            LOG.debug('Ignoring device "%s" as it is not ssd and --disks-only-ssds=true', device_by_id)
+            continue
+
         if remove_in_use:
             if device_not_in_use(device):
-                devices_by_id.append('/dev/disk/by-id/' + dev_to_by_id_map[device])
+                devices_by_id.append('/dev/disk/by-id/' + device_by_id)
             else:
                 # Do not consider devices which are currently in use
-                LOG.debug('Ignoring device "%s" as it is currently is use', dev_to_by_id_map[device])
+                LOG.debug('Ignoring device "%s" as it is currently is use', device_by_id)
 
     return devices_by_id
 
@@ -500,9 +512,24 @@ def parse_args():
         default = '',
         help    = 'Select disks by partlabel via regexp against /dev/disk/by-partlabel (default none)', )
 
+    parser.add_argument(
+        '--disks-only-rotational',
+#        metavar = 'BOOLEAN',
+        action  = 'store_true',
+        default = False,
+        help    = 'Only select rotational disks by selectors (default false)', )
+
+    parser.add_argument(
+        '--disks-only-ssds',
+#        metavar = 'BOOLEAN',
+        action  = 'store_true',
+        default = False,
+        help    = 'Only select ssd disks by selectors (default false)', )
+
     parser.set_defaults(
         # we want to hold on to this, for later
         prog=parser.prog,
+#        disks_only_ssds=True,
 #        cluster='ceph', 
     )
 
@@ -536,6 +563,10 @@ def parse_args():
         function=main_debug, )
 
     args = parser.parse_args()
+
+    # Dump args array
+    LOG.info('Current args: %s', pprint.pformat(args))
+
     return args
 
 
