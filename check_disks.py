@@ -504,6 +504,8 @@ def main_ceph_deploy_osd_prepare(args):
 #        process = command_check_call(ceph_deploy_call)
 
         journal_devices_partitions[best] += 1
+        LOG.debug('Waiting 5 secs...')
+        sleep(5)
 
 def main_badblocks(args):
 
