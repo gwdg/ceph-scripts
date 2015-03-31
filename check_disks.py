@@ -18,6 +18,7 @@ import subprocess
 import atexit
 import argparse
 import pprint
+import time
 
 from multiprocessing.dummy import Pool as ThreadPool
 from Queue import PriorityQueue
@@ -464,7 +465,8 @@ def main_debug(args):
     for device in devices_by_id:
         LOG.info('- %s', device)
 
-CEPH_DEPLOY_OSD_PREPARE_CALL = [ 'ceph-deploy', 'osd', 'prepare' ]
+CEPH_DEPLOY_OSD_PREPARE_CALL    = [ 'ceph-deploy', 'osd',       'prepare' ]
+CEPH_DEPLOY_DISK_ZAP_CALL       = [ 'ceph-deploy', 'disk',      'zap']
 
 def main_ceph_deploy_osd_prepare(args):
 
@@ -495,17 +497,23 @@ def main_ceph_deploy_osd_prepare(args):
                 best = i
         LOG.debug('Using journal device "%s" for osd device "%s"', journal_devices[best], osd_device)
 
-        osd_location = args.host + ':/' + osd_device + ':' + journal_devices[best]
+        osd_location = args.host + ':' + osd_device
+
+        # Zap osd device first
+        ceph_deploy_call = CEPH_DEPLOY_DISK_ZAP_CALL[:]
+        ceph_deploy_call.extend([osd_location])
+
+        process = command_check_call(ceph_deploy_call, args)
 
         # Run 'ceph-deploy osd prepare'
         ceph_deploy_call = CEPH_DEPLOY_OSD_PREPARE_CALL[:]
-        ceph_deploy_call.extend([osd_location])
+        ceph_deploy_call.extend([osd_location + ':' + journal_devices[best]])
 
-#        process = command_check_call(ceph_deploy_call)
+        process = command_check_call(ceph_deploy_call, args)
 
         journal_devices_partitions[best] += 1
         LOG.debug('Waiting 5 secs...')
-        sleep(5)
+        time.sleep(5)
 
 def main_badblocks(args):
 
