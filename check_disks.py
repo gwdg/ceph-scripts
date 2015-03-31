@@ -501,11 +501,11 @@ def main_ceph_deploy_osd_prepare(args):
         ceph_deploy_call = CEPH_DEPLOY_OSD_PREPARE_CALL[:]
         ceph_deploy_call.extend([osd_location])
 
-        process = command_check_call(ceph_deploy_call)
+#        process = command_check_call(ceph_deploy_call)
 
 def main_badblocks(args):
 
-     LOG.info('Running badblocks...')
+    LOG.info('Running badblocks...')
 
     # Create log dir for badblocks
     mkdir(LOG_DIR + '/badblocks')
@@ -546,6 +546,7 @@ def parse_args():
 
     parser.add_argument(
         '--dry-run',
+        action  = 'store_true',
         default = False,
         help    = 'Do not modify system state, just print commands to be run (default false)', )
 
@@ -623,13 +624,15 @@ def parse_args():
 
     ceph_deploy_osd_prepare_parser.add_argument(
         '--host',
-        metavar = 'HOST',
-        help    = 'Host to run ceph-deploy on', )
+        metavar         = 'HOST',
+        required        = True,
+        help            = 'Host to run ceph-deploy on', )
 
     ceph_deploy_osd_prepare_parser.add_argument( 
         '--journal-devices',
-        metavar = 'DEVICE1, DEVICE2, ...',
-        help    = 'List of block device to create journal partitions on (will be used round robin)', )
+        metavar         = 'DEVICE1,DEVICE2, ...',
+        required        = True,
+        help            = 'List of block device to create journal partitions on (will be used round robin)', )
 
     ceph_deploy_osd_prepare_parser.set_defaults(
         function=main_ceph_deploy_osd_prepare, )
