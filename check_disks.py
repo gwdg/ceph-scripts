@@ -503,6 +503,8 @@ def main_ceph_deploy_osd_prepare(args):
 
 #        process = command_check_call(ceph_deploy_call)
 
+        journal_devices_partitions[best] += 1
+
 def main_badblocks(args):
 
     LOG.info('Running badblocks...')
