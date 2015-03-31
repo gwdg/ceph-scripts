@@ -268,6 +268,31 @@ def device_not_in_use(dev, check_partitions = True):
 
 # ---------- Own util stuff
 
+def device_is_ssd(dev):
+    """
+    Check if given device is an ssd (device needs to be referenced as /dev/*)
+    """
+    dev = os.path.realpath(dev)
+    if not stat.S_ISBLK(os.lstat(dev).st_mode):
+        raise Error('not a block device', dev)
+
+    dev_name = get_dev_name(dev)
+    sys_path = '/sys/block/' + dev_name + '/queue/rotational'
+    if not os.path.exists(sys_path):
+       raise Error('Could not check if device "%s" is a ssd: path "%s" does not exist!', dev, sys_path)
+
+    # Get info from sysfs
+    rotational_raw = open(sys_path).read()
+
+    if rotational_raw == '1':
+        return False
+    else:
+        return True
+
+def device_is_rotational(dev):
+    return not device_is_ssd(dev)
+
+
 processes = []
 
 @atexit.register
