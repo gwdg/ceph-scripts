@@ -17,9 +17,12 @@ import re
 import subprocess
 import atexit
 import argparse
+import pprint
 
 from multiprocessing.dummy import Pool as ThreadPool
 from Queue import PriorityQueue
+
+LOG = logging.getLogger(os.path.basename(sys.argv[0]))
 
 ###### exceptions ########
 
@@ -144,9 +147,6 @@ def mkdir(*a, **kw):
 
 # ---------- Own util stuff
 
-
-
-
 processes = []
 
 @atexit.register
@@ -154,15 +154,102 @@ def kill_subprocesses():
     for process in processes:
         process.kill()
 
+# List of selected devices referencing devices in /dev directly
+devices         = []
+
+# List of selected devices referencing devices by id (i.e. from /dev/disk/by-id)
+devices_by_id   = []
 
 DEVICES = '^(ata-HDS)|(ata-ST3000)'
-DEVICES_PATH = '/dev/disk/by-id'
 
 LOG_DIR = '/tmp'
 
 THREADS = 30
 
 BADBLOCKS_CALL = [ 'badblocks', '-b', '4096', '-v', '-w']
+
+def select_devices(args):
+
+    # List of selected devices referencing devices in /dev directly
+    devices         = []
+
+    # List of selected devices referencing devices by id (i.e. from /dev/disk/by-id)
+    devices_by_id   = []
+
+    LOG.info('Building device selection...')
+
+    # Process selection by-id
+    if args.disks_by_id:
+        LOG.info('Adding device selection by id...')
+        for device in os.listdir('/dev/disk/by-id'):
+
+            # Ignore partitions
+            if re.match(r'.*-part[0-9]+$', device):
+                LOG.debug('Ignoring partition: %s', device)
+                continue
+
+            # Match devices
+            if re.match(r'%s' % args.disks_by_id, device):
+                LOG.info('Adding device to list: %s', device)
+                devices.append(os.path.realpath('/dev/disk/by-id/' + device))
+
+    # Process selection by-path
+    if args.disks_by_path:
+        LOG.info('Adding device selection by path...')
+        for device in os.listdir('/dev/disk/by-path'):
+            
+            # Ignore partitions
+            if re.match(r'.*-part[0-9]+$', device):
+                LOG.debug('Ignoring partition: %s', device)
+                continue
+
+            # Match devices
+            if re.match(r'%s' % args.disks_by_path, device):
+                LOG.info('Adding device to list: %s', device)
+                devices.append(os.path.realpath('/dev/disk/by-path/' + device))
+
+    # Process selection by-partlabel
+    if args.disks_by_partlabel:
+        LOG.info('Adding device selection by partlabel...')
+        for device in os.listdir('/dev/disk/by-partlabel'):
+            
+            # Match devices
+            if re.match(r'%s' % args.disks_by_partlabel, device):
+                LOG.info('Adding device to list: %s', device)
+                devices.append(os.path.realpath('/dev/disk/by-partlabel/' + device))
+
+    # Remove dupes
+    devices = list(set(devices))
+
+    # Translate to by-id devices for usage in commands
+
+    # First build by-id -> /dev mapping from /dev/disk/by-id
+    by_id_to_dev_map = {}
+    for device in os.listdir('/dev/disk/by-id'):
+            
+        # Ignore partitions
+        if re.match(r'.*-part[0-9]+$', device):
+#            LOG.debug('Ignoring partition: %s', device)
+            continue
+
+        # Match devices
+        if re.match(r'%s' % args.disks_by_id, device):
+#            LOG.info('Adding device to list: %s', device)
+            by_id_to_dev_map[device] = os.path.realpath('/dev/disk/by-id/' + device)
+            LOG.debug("Mapping device '%s' to '%s'", device, by_id_to_dev_map[device])
+
+    # Create inverse map
+    pp = pprint.PrettyPrinter(indent=4)
+    LOG.debug('by_id_to_dev_map: %s', pp.pprint(by_id_to_dev_map))
+
+    dev_to_by_id_map = {v: k for k, v in by_id_to_dev_map.items()}
+    LOG.debug('dev_to_by_id_map: %s', pp.pprint(dev_to_by_id_map))
+ 
+    # Translate devices into by-id format (absolute path included)
+    for device in devices:
+        devices_by_id.append('/dev/disk/by-id/' + dev_to_by_id_map[device])
+
+    return devices_by_id
 
 def check_disk(device):
 
@@ -197,27 +284,26 @@ def main_debug(args):
 
     LOG.info('Running debug...')
 
+    # Create a list of selected devices
+    devices_by_id = select_devices(args)
+
+    # Dump selected disks
+    LOG.info('Selected disks:')
+    for device in devices_by_id:
+        LOG.info('- %s', device)
+
 def main_badblocks(args):
 
     # Create log dir for badblocks
     mkdir(LOG_DIR + '/badblocks')
 
+    # Create a list of devices to run badblocks on
+    devices_by_id = select_devices(args)
+
     pool = ThreadPool(THREADS)
 
-    # Create a list of devices to run badblocks on
-    devices = []
-    for device in os.listdir(DEVICES_PATH):
-        # Ignore partitions
-        if re.match(r'.*-part[0-9]+$', device):
-            LOG.debug('Ignoring partition: %s', device)
-            continue
-        # Match devices
-        if re.match(r'%s' % DEVICES, device):
-            LOG.info('Adding device to list: %s', device)
-            devices.append(device)
-
     try:
-        results = pool.map(check_disk, devices)
+        results = pool.map(check_disk, devices_by_id)
 
     except KeyboardInterrupt:
         kill_subprocesses()
@@ -244,11 +330,30 @@ def parse_args():
         metavar = 'PATH',
         default = '/tmp',
         help    = 'write log / output files to this dir (default /tmp)', )
- 
+
+    parser.add_argument(
+        '--disks-by-id',
+        metavar = 'DISKS',
+        default = '',
+        help    = 'Select disks by id via regexp against /dev/disk/by-id (default none)', )
+
+    parser.add_argument(
+        '--disks-by-path',
+        metavar = 'DISKS',
+        default = '',
+        help    = 'Select disks by path via regexp against /dev/disk/by-path (default none)', )
+
+    parser.add_argument(
+        '--disks-by-partlabel',
+        metavar = 'DISKS',
+        default = '',
+        help    = 'Select disks by partlabel via regexp against /dev/disk/by-partlabel (default none)', )
+
     parser.set_defaults(
         # we want to hold on to this, for later
         prog=parser.prog,
-#        cluster='ceph', )
+#        cluster='ceph', 
+    )
 
     subparsers = parser.add_subparsers(
         title='subcommands',
@@ -265,7 +370,7 @@ def parse_args():
 #        help='cluster name to assign this disk to',)
 
     badblocks_parser.set_defaults(
-        func=main_badblocks, )
+        function=main_badblocks, )
 
     # debug related arguments
 
@@ -276,8 +381,8 @@ def parse_args():
 #        metavar='NAME',
 #        help='cluster name to assign this disk to',)
 
-    badblocks_parser.set_defaults(
-        func=main_debug, )
+    debug_parser.set_defaults(
+        function=main_debug, )
 
     args = parser.parse_args()
     return args
@@ -293,7 +398,7 @@ def main():
 
     # Initialize logging
 
-    LOG = logging.getLogger(os.path.basename(sys.argv[0]))
+#    LOG = logging.getLogger(os.path.basename(sys.argv[0]))
     LOG.setLevel(loglevel)
 
     # Create console handler and set level to debug
@@ -312,7 +417,7 @@ def main():
 #        os.environ['PATH'] = args.prepend_to_path + ":" + path
 
     try:
-        args.func(args)
+        args.function(args)
 
     except Error as e:
         raise SystemExit(
