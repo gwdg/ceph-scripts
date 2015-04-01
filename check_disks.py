@@ -465,8 +465,8 @@ def main_debug(args):
     for device in devices_by_id:
         LOG.info('- %s', device)
 
-CEPH_DEPLOY_OSD_PREPARE_CALL    = [ 'ceph-deploy', 'osd',       'prepare' ]
-CEPH_DEPLOY_DISK_ZAP_CALL       = [ 'ceph-deploy', 'disk',      'zap']
+CEPH_DEPLOY_OSD_PREPARE_CALL    = [ 'ceph-deploy', '--overwrite-conf',  'osd',       'prepare' ]
+CEPH_DEPLOY_DISK_ZAP_CALL       = [ 'ceph-deploy', '--overwrite-conf',  'disk',      'zap']
 
 def main_ceph_deploy_osd_prepare(args):
 
