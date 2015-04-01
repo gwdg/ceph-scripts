@@ -23,6 +23,9 @@ import time
 from multiprocessing.dummy import Pool as ThreadPool
 from Queue import PriorityQueue
 
+# Stuff from ceph-deploy
+from ceph_deploy.lib import remoto
+
 LOG = logging.getLogger(os.path.basename(sys.argv[0]))
 
 ###### exceptions ########
@@ -170,43 +173,45 @@ def get_dev_name(path):
     base = path[5:]
     return base.replace('/', '!')
 
-def is_mounted(dev):
+def remote_is_mounted(connection, device, args):
     """
     Check if the given device is mounted.
     """
-    dev = os.path.realpath(dev)
-    with file('/proc/mounts', 'rb') as proc_mounts:
-        for line in proc_mounts:
-            fields = line.split()
-            if len(fields) < 3:
-                continue
-            mounts_dev = fields[0]
-            path = fields[1]
-            if mounts_dev.startswith('/') and os.path.exists(mounts_dev):
-                mounts_dev = os.path.realpath(mounts_dev)
-                if mounts_dev == dev:
-                    return path
+    device = remote_path_realpath(connection, device, args)
+    (stdout, exit_code) = remote_run_process_and_check(connection, ['cat', '/proc/mounts'], args)
+
+    for line in stdout: 
+        fields = line.split()
+        if len(fields) < 3:
+            continue
+        mounts_dev = fields[0]
+        path = fields[1]
+        if mounts_dev.startswith('/') and remote_path_exists(connection, mounts_dev, args):
+            mounts_dev = remote_path_realpath(connection, mounts_dev, args)
+            if mounts_dev == device:
+                return path
+
     return None
 
-def is_held(dev):
+def remote_is_held(connection, device, args):
     """
     Check if a device is held by another device (e.g., a dm-crypt mapping)
     """
-    assert os.path.exists(dev)
-    dev = os.path.realpath(dev)
-    base = get_dev_name(dev)
+    assert remote_path_exists(connection, device, args)
+    device = remote_path_realpath(connection, device, args)
+    base = get_dev_name(device)
 
     # full disk?
     directory = '/sys/block/{base}/holders'.format(base=base)
-    if os.path.exists(directory):
-        return os.listdir(directory)
+    if remote_path_exists(connection, directory, args):
+        return remote_listdir(connection, directory, args)
 
     # partition?
     part = base
     while len(base):
         directory = '/sys/block/{base}/{part}/holders'.format(part=part, base=base)
-        if os.path.exists(directory):
-            return os.listdir(directory)
+        if remote_path_exists(connection, directory, args):
+            return remote_listdir(connection, directory, args)
         base = base[:-1]
     return []
 
@@ -221,88 +226,185 @@ def get_dev_path(name):
     """
     return '/dev/' + name.replace('!', '/')
 
-def list_partitions(basename):
+def remote_list_partitions(connection, basename, args):
     """
     Return a list of partitions on the given device name
     """
     partitions = []
-    for name in os.listdir(os.path.join('/sys/block', basename)):
+    for name in remote_listdir(connection, os.path.join('/sys/block', basename), args):
         if name.startswith(basename):
             partitions.append(name)
     return partitions
 
-def is_partition(dev):
+def remote_is_partition(connection, device, args):
     """
     Check whether a given device path is a partition or a full disk.
     """
-    dev = os.path.realpath(dev)
-    if not stat.S_ISBLK(os.lstat(dev).st_mode):
-        raise Error('not a block device', dev)
+    device = remote_path_realpath(connection, device, args)
 
-    name = get_dev_name(dev)
-    if os.path.exists(os.path.join('/sys/block', name)):
+#    if not stat.S_ISBLK(os.lstat(dev).st_mode):
+#        raise Error('not a block device', dev)
+
+    name = get_dev_name(device)
+    if remote_path_exists(connection, '/sys/block/' + name, args):
         return False
 
     # make sure it is a partition of something else
-    for basename in os.listdir('/sys/block'):
-        if os.path.exists(os.path.join('/sys/block', basename, name)):
+    for basename in remote_listdir(connection, '/sys/block', args):
+        if remote_path_exists(connection, '/sys/block/' + basename + '/' + name):
             return True
 
-    raise Error('not a disk or partition', dev)
+    raise Error('not a disk or partition', device)
 
-def device_not_in_use(dev, check_partitions = True):
+def remote_device_not_in_use(connection, device, args, check_partitions = True):
     """
     Verify if a given device (path) is in use (e.g. mounted or
     in use by device-mapper).
     """
-    assert os.path.exists(dev)
+    assert remote_path_exists(connection, device, args)
 
-    if is_mounted(dev):
+    LOG.info('*** Checking if device "%s" is in use', device)
+
+    if remote_is_mounted(connection, device, args):
         return False
-    holders = is_held(dev)
+
+    holders = remote_is_held(connection, device, args)
 
     if holders:
         return False
 
-    if check_partitions and not is_partition(dev):
-        basename = get_dev_name(os.path.realpath(dev))
-        for partname in list_partitions(basename):
+    if check_partitions and not remote_is_partition(connection, device, args):
+        LOG.info('*** Checking partitions...')
+        basename = get_dev_name(remote_path_realpath(connection, device, args))
+        for partname in remote_list_partitions(connection, basename, args):
             partition = get_dev_path(partname)
-            if is_mounted(partition):
+            if remote_is_mounted(connection, partition, args):
+                LOG.info('*** Partition "%s" mounted', partition)
                 return False
-            holders = is_held(partition)
+            holders = remote_is_held(connection, partition, args)
             if holders:
                 return False
 
     return True
 
+# ----- Util stuff from ceph-deploy
+
+def get_connection(hostname, username, logger, threads=5, use_sudo=None, detect_sudo=True):
+    """
+    A very simple helper, meant to return a connection
+    that will know about the need to use sudo.
+    """
+    if username:
+        hostname = "%s@%s" % (username, hostname)
+    try:
+        conn = remoto.Connection(
+            hostname,
+            logger=logger,
+            threads=threads,
+            detect_sudo=detect_sudo,
+        )
+
+        # Set a timeout value in seconds to disconnect and move on
+        # if no data is sent back.
+        conn.global_timeout = 300
+        logger.debug("connected to host: %s " % hostname)
+        return conn
+
+    except Exception as error:
+        msg = "connecting to host: %s " % hostname
+        errors = "resulted in errors: %s %s" % (error.__class__.__name__, error)
+        raise RuntimeError(msg + errors)
+
+def _remote_get_command_executable(connection, arguments):
+    """
+    Return the full path for an executable, raise if the executable is not
+    found. If the executable has already a full path do not perform any checks.
+    """
+
+    if arguments[0].startswith('/'):  # an absolute path
+        return arguments
+
+    # Run 'which' remotely to get the full path
+    (stdout, stderr, exit_code) = remoto.process.check(connection, ['which', arguments[0]])
+
+    executable = stdout[0]
+#    LOG.info('>>> output: %s, %s, %s', stdout, stderr, exit_code)
+    if not executable:
+        command_msg = 'Could not run command: %s' % ' '.join(arguments)
+        executable_msg = '%s not in path.' % arguments[0]
+        raise ExecutableNotFound('%s %s' % (executable_msg, command_msg))
+
+    # swap the old executable for the new one
+    arguments[0] = executable
+
+    return arguments
+
+def remote_run_process_and_check(connection, arguments, args, **kwargs):
+
+    arguments = _remote_get_command_executable(connection, arguments)
+    LOG.debug('Arguments: %s', pprint.pformat(arguments))
+    LOG.info('Running command: %s' % ' '.join(arguments))
+    if not args.dry_run:
+        (stdout, stderr, exit_code) = remoto.process.check(connection, arguments, **kwargs)
+        LOG.debug('stdout: %s', pprint.pformat(stdout))
+        return stdout, exit_code
+    else:
+        # Return fake data
+        return '', 0
+
 # ---------- Own util stuff
 
-def device_is_ssd(dev):
+def remote_path_realpath(connection, path, args):
+
+    (stdout, exit_code) = remote_run_process_and_check(connection, ['readlink', '-f', '-n', path], args)
+
+    return stdout[0]
+
+def remote_path_exists(connection, path, args):
+
+    (stdout, exit_code) = remote_run_process_and_check(connection, ['readlink', '-f', '-n', path], args)
+
+    if exit_code == 0:
+        return True
+    
+    return False
+
+def remote_listdir(connection, path, args):
+
+    (stdout, exit_code) = remote_run_process_and_check(connection, ['ls', path], args)
+
+#    dir_entries = str.split(stdout, ', ')
+
+    return stdout
+
+
+def device_is_ssd(connection, device, args):
     """
     Check if given device is an ssd (device needs to be referenced as /dev/*)
     """
-    dev = os.path.realpath(dev)
-    if not stat.S_ISBLK(os.lstat(dev).st_mode):
-        raise Error('not a block device', dev)
 
-    dev_name = get_dev_name(dev)
-    sys_path = '/sys/block/' + dev_name + '/queue/rotational'
-    if not os.path.exists(sys_path):
-       raise Error('Could not check if device "%s" is a ssd: path "%s" does not exist!', dev, sys_path)
+    device = remote_path_realpath(connection, device, args)
+#    if not stat.S_ISBLK(os.lstat(dev).st_mode):
+#        raise Error('not a block device', dev)
+
+    device_name = get_dev_name(device)
+    sys_path    = '/sys/block/' + device_name + '/queue/rotational'
+
+    if not remote_path_exists(connection, sys_path, args):
+       raise Error('Could not check if device "%s" is a ssd: path "%s" does not exist!', device, sys_path)
 
     # Get info from sysfs
-    rotational_raw = open(sys_path).read().rstrip('\n')
+    (rotational_raw, exit_code) = remote_run_process_and_check(connection, ['cat', sys_path], args)
+#    rotational_raw = open(sys_path).read().rstrip('\n')
 
-#    LOG.debug('Rotational status for device "%s": "%s"', dev, rotational_raw)
-    if rotational_raw == '1':
+    LOG.debug('Rotational status for device "%s": "%s"', device, rotational_raw[0])
+    if rotational_raw[0] == '1':
         return False
     else:
         return True
 
-def device_is_rotational(dev):
-    return not device_is_ssd(dev)
-
+def device_is_rotational(connection, device, args):
+    return not device_is_ssd(connection, device, args)
 
 processes = []
 
@@ -325,7 +427,7 @@ THREADS = 30
 
 BADBLOCKS_CALL = [ 'badblocks', '-b', '4096', '-v', '-w']
 
-def select_devices(args, remove_in_use = True):
+def select_devices(connection, args, remove_in_use = True):
 
     # List of selected devices referencing devices in /dev directly
     devices         = []
@@ -338,7 +440,7 @@ def select_devices(args, remove_in_use = True):
     # Process selection by-id
     if args.disks_by_id:
         LOG.info('Adding device selection by id...')
-        for device in os.listdir('/dev/disk/by-id'):
+        for device in remote_listdir(connection, '/dev/disk/by-id', args):
 
             # Ignore partitions
             if re.match(r'.*-part[0-9]+$', device):
@@ -348,12 +450,12 @@ def select_devices(args, remove_in_use = True):
             # Match devices
             if re.match(r'%s' % args.disks_by_id, device):
                 LOG.info('Adding device to list: %s', device)
-                devices.append(os.path.realpath('/dev/disk/by-id/' + device))
+                devices.append(remote_path_realpath(connection, '/dev/disk/by-id/' + device, args))
 
     # Process selection by-path
     if args.disks_by_path:
         LOG.info('Adding device selection by path...')
-        for device in os.listdir('/dev/disk/by-path'):
+        for device in remote_listdir(connection, '/dev/disk/by-path', args):
             
             # Ignore partitions
             if re.match(r'.*-part[0-9]+$', device):
@@ -363,17 +465,17 @@ def select_devices(args, remove_in_use = True):
             # Match devices
             if re.match(r'%s' % args.disks_by_path, device):
                 LOG.info('Adding device to list: %s', device)
-                devices.append(os.path.realpath('/dev/disk/by-path/' + device))
+                devices.append(remote_path_realpath(connection, '/dev/disk/by-path/' + device, args))
 
     # Process selection by-partlabel
     if args.disks_by_partlabel:
         LOG.info('Adding device selection by partlabel...')
-        for device in os.listdir('/dev/disk/by-partlabel'):
+        for device in remote_listdir(connection, '/dev/disk/by-partlabel', args):
             
             # Match devices
             if re.match(r'%s' % args.disks_by_partlabel, device):
                 LOG.info('Adding device to list: %s', device)
-                devices.append(os.path.realpath('/dev/disk/by-partlabel/' + device))
+                devices.append(remote_path_realpath(connection, '/dev/disk/by-partlabel/' + device, args))
 
     # Remove dupes
     devices = list(set(devices))
@@ -382,7 +484,7 @@ def select_devices(args, remove_in_use = True):
 
     # First build by-id -> /dev mapping from /dev/disk/by-id
     by_id_to_dev_map = {}
-    for device in os.listdir('/dev/disk/by-id'):
+    for device in remote_listdir(connection, '/dev/disk/by-id', args):
             
         # Ignore partitions
         if re.match(r'.*-part[0-9]+$', device):
@@ -392,7 +494,7 @@ def select_devices(args, remove_in_use = True):
         # Match devices
         if re.match(r'%s' % args.disks_by_id, device):
 #            LOG.info('Adding device to list: %s', device)
-            by_id_to_dev_map[device] = os.path.realpath('/dev/disk/by-id/' + device)
+            by_id_to_dev_map[device] = remote_path_realpath(connection, '/dev/disk/by-id/' + device, args)
             LOG.debug("Mapping device '%s' to '%s'", device, by_id_to_dev_map[device])
 
     # Create inverse map
@@ -407,16 +509,16 @@ def select_devices(args, remove_in_use = True):
 
         device_by_id = dev_to_by_id_map[device]
 
-        if args.disks_only_rotational and not device_is_rotational(device):
+        if args.disks_only_rotational and not device_is_rotational(connection, device, args):
             LOG.debug('Ignoring device "%s" as it is not rotational and --disks-only-rotational=true', device_by_id)
             continue
 
-        if args.disks_only_ssds and not device_is_ssd(device):
+        if args.disks_only_ssds and not device_is_ssd(connection, device, args):
             LOG.debug('Ignoring device "%s" as it is not ssd and --disks-only-ssds=true', device_by_id)
             continue
 
         if remove_in_use:
-            if device_not_in_use(device):
+            if remote_device_not_in_use(connection, device, args):
                 devices_by_id.append('/dev/disk/by-id/' + device_by_id)
             else:
                 # Do not consider devices which are currently in use
@@ -458,7 +560,8 @@ def main_debug(args):
     LOG.info('Running debug...')
 
     # Get the list of selected devices
-    devices_by_id = select_devices(args)
+    connection = get_connection(args.host, args.user, LOG)
+    devices_by_id = select_devices(connection, args)
 
     # Dump selected disks
     LOG.info('Selected disks:')
@@ -547,45 +650,58 @@ def parse_args():
 
     parser.add_argument(
         '-v', '--verbose',
-        action  = 'store_true', default = None,
-        help    = 'be more verbose', )
+        action          = 'store_true', default = None,
+        help            = 'be more verbose', )
 
     parser.add_argument(
         '--logdir',
-        metavar = 'PATH',
-        default = '/tmp',
-        help    = 'write log / output files to this dir (default /tmp)', )
+        metavar         = 'PATH',
+        default         = '/tmp',
+        help            = 'write log / output files to this dir (default /tmp)', )
 
     parser.add_argument(
         '--dry-run',
-        action  = 'store_true',
-        default = False,
-        help    = 'Do not modify system state, just print commands to be run (default false)', )
+        action          = 'store_true',
+        default         = False,
+        help            = 'Do not modify system state, just print commands to be run (default false)', )
+
+    parser.add_argument(
+        '--host',
+        metavar         = 'HOST',
+        default         = 'localhost',
+#        required        = True,
+        help            = 'Host to run commands on (needs keyless ssh setup)', )
+
+    parser.add_argument(
+        '--user',
+        metavar         = 'USER',
+        required        = True,
+        help            = 'Host to run commands on (needs keyless ssh setup)', )
 
     parser.add_argument(
         '--disks-by-id',
-        metavar = 'DISKS',
-        default = '',
-        help    = 'Select disks by id via regexp against /dev/disk/by-id (default none)', )
+        metavar         = 'DISKS',
+#        default         = '',
+        help            = 'Select disks by id via regexp against /dev/disk/by-id (default none)', )
 
     parser.add_argument(
         '--disks-by-path',
-        metavar = 'DISKS',
-        default = '',
-        help    = 'Select disks by path via regexp against /dev/disk/by-path (default none)', )
+        metavar         = 'DISKS',
+#        default         = '',
+        help            = 'Select disks by path via regexp against /dev/disk/by-path (default none)', )
 
     parser.add_argument(
         '--disks-by-partlabel',
-        metavar = 'DISKS',
-        default = '',
-        help    = 'Select disks by partlabel via regexp against /dev/disk/by-partlabel (default none)', )
+        metavar         = 'DISKS',
+#        default        = '',
+        help            = 'Select disks by partlabel via regexp against /dev/disk/by-partlabel (default none)', )
 
     parser.add_argument(
         '--disks-only-rotational',
-#        metavar = 'BOOLEAN',
-        action  = 'store_true',
-        default = False,
-        help    = 'Only select rotational disks by selectors (default false)', )
+#        metavar        = 'BOOLEAN',
+        action          = 'store_true',
+        default         = False,
+        help            = 'Only select rotational disks by selectors (default false)', )
 
     parser.add_argument(
         '--disks-only-ssds',
@@ -596,15 +712,15 @@ def parse_args():
 
     parser.set_defaults(
         # we want to hold on to this, for later
-        prog=parser.prog,
+        prog = parser.prog,
 #        disks_only_ssds=True,
 #        cluster='ceph', 
     )
 
     subparsers = parser.add_subparsers(
-        title='subcommands',
-        description='valid subcommands',
-        help='sub-command help', )
+        title           = 'subcommands',
+        description     = 'valid subcommands',
+        help            = 'sub-command help', )
 
     # badblocks related arguments
 
@@ -634,11 +750,11 @@ def parse_args():
 
     ceph_deploy_osd_prepare_parser = subparsers.add_parser('ceph-deploy-osd-prepare', help='Run "ceph-deploy osd prepare" on selected disks')
 
-    ceph_deploy_osd_prepare_parser.add_argument(
-        '--host',
-        metavar         = 'HOST',
-        required        = True,
-        help            = 'Host to run ceph-deploy on', )
+#    ceph_deploy_osd_prepare_parser.add_argument(
+#        '--host',
+#        metavar         = 'HOST',
+#        required        = True,
+#        help            = 'Host to run ceph-deploy on', )
 
     ceph_deploy_osd_prepare_parser.add_argument( 
         '--journal-devices',
@@ -655,7 +771,6 @@ def parse_args():
     LOG.info('Current args: %s', pprint.pformat(args))
 
     return args
-
 
 def main():
 
