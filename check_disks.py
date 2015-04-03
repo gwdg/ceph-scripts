@@ -568,15 +568,13 @@ def main_debug(args):
     for device in devices_by_id:
         LOG.info('- %s', device)
 
-CEPH_DEPLOY_OSD_PREPARE_CALL    = [ 'ceph-deploy', '--overwrite-conf',  'osd',       'prepare' ]
-CEPH_DEPLOY_DISK_ZAP_CALL       = [ 'ceph-deploy', '--overwrite-conf',  'disk',      'zap']
-
 def main_ceph_deploy_osd_prepare(args):
 
     LOG.info('Running ceph deploy osd prepare...')
 
     # Get the list of selected devices
-    devices_by_id = select_devices(args)
+    connection = get_connection(args.host, args.user, LOG)
+    devices_by_id = select_devices(connection, args)
 
     # Get list of journal devices to use
     journal_devices = str.split(args.journal_devices, ',')
@@ -586,7 +584,7 @@ def main_ceph_deploy_osd_prepare(args):
     journal_devices_partitions = [None] * len(journal_devices)
     for i in range(0, len(journal_devices)):
         device_base_name = get_dev_name(journal_devices[i])
-        partitions = list_partitions(device_base_name)
+        partitions = remote_list_partitions(connection, device_base_name, args)
         journal_devices_partitions[i] = len(partitions)
         LOG.debug('Current number of partitions on journal device "%s": %i', device_base_name, len(partitions))
 
@@ -603,14 +601,12 @@ def main_ceph_deploy_osd_prepare(args):
         osd_location = args.host + ':' + osd_device
 
         # Zap osd device first
-        ceph_deploy_call = CEPH_DEPLOY_DISK_ZAP_CALL[:]
-        ceph_deploy_call.extend([osd_location])
+        ceph_deploy_call = [ 'ceph-deploy', '--overwrite-conf', 'disk', 'zap', osd_location ]
 
         process = command_check_call(ceph_deploy_call, args)
 
         # Run 'ceph-deploy osd prepare'
-        ceph_deploy_call = CEPH_DEPLOY_OSD_PREPARE_CALL[:]
-        ceph_deploy_call.extend([osd_location + ':' + journal_devices[best]])
+        ceph_deploy_call = [ 'ceph-deploy', '--overwrite-conf', 'osd', 'prepare', osd_location + ':' + journal_devices[best] ]
 
         process = command_check_call(ceph_deploy_call, args)
 
