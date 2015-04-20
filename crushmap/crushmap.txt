@@ -1,3 +1,4 @@
+
 # begin crush map
 tunable choose_local_tries 0
 tunable choose_local_fallback_tries 0
@@ -5,7 +6,7 @@ tunable choose_total_tries 50
 tunable chooseleaf_descend_once 1
 tunable straw_calc_version 1
 
-# devices
+# devices (disk)
 device 0 osd.0
 device 1 osd.1
 device 2 osd.2
@@ -187,6 +188,38 @@ device 177 osd.177
 device 178 osd.178
 device 179 osd.179
 
+# devices (ssd)
+device 180 osd.180
+device 181 osd.181
+device 182 osd.182
+device 183 osd.183
+device 184 osd.184
+device 185 osd.185
+device 186 osd.186
+device 187 osd.187
+device 188 osd.188
+device 189 osd.189
+device 190 osd.190
+device 191 osd.191
+device 192 osd.192
+device 193 osd.193
+device 194 osd.194
+device 195 osd.195
+device 196 osd.196
+device 197 osd.197
+device 198 osd.198
+device 199 osd.199
+device 200 osd.200
+device 201 osd.201
+device 202 osd.202
+device 203 osd.203
+device 204 osd.204
+device 205 osd.205
+device 206 osd.206
+device 207 osd.207
+device 208 osd.208
+device 209 osd.209
+
 # types
 type 0 osd
 type 1 host
@@ -202,114 +235,6 @@ type 10 root
 type 20 journal
 
 # buckets
-host disk-ceph-06 {
-	id -2		# do not change unnecessarily
-	# weight 67.340
-	alg straw2
-	hash 0	# rjenkins1
-	item osd.0 weight 1.820
-	item osd.1 weight 1.820
-	item osd.2 weight 1.820
-	item osd.3 weight 1.820
-	item osd.4 weight 1.820
-	item osd.5 weight 1.820
-	item osd.6 weight 1.820
-	item osd.7 weight 1.820
-	item osd.8 weight 1.820
-	item osd.9 weight 1.820
-	item osd.10 weight 1.820
-	item osd.11 weight 1.820
-	item osd.12 weight 1.820
-	item osd.13 weight 1.820
-	item osd.14 weight 1.820
-	item osd.15 weight 2.730
-	item osd.16 weight 1.820
-	item osd.17 weight 2.730
-	item osd.18 weight 2.730
-	item osd.19 weight 2.730
-	item osd.20 weight 2.730
-	item osd.21 weight 2.730
-	item osd.22 weight 2.730
-	item osd.23 weight 2.730
-	item osd.24 weight 2.730
-	item osd.25 weight 2.730
-	item osd.26 weight 2.730
-	item osd.27 weight 2.730
-	item osd.28 weight 2.730
-	item osd.29 weight 2.730
-}
-host disk-ceph-05 {
-	id -3		# do not change unnecessarily
-	# weight 67.340
-	alg straw2
-	hash 0	# rjenkins1
-	item osd.30 weight 1.820
-	item osd.31 weight 1.820
-	item osd.32 weight 1.820
-	item osd.33 weight 1.820
-	item osd.34 weight 1.820
-	item osd.35 weight 1.820
-	item osd.36 weight 1.820
-	item osd.37 weight 1.820
-	item osd.38 weight 1.820
-	item osd.39 weight 1.820
-	item osd.40 weight 1.820
-	item osd.41 weight 1.820
-	item osd.42 weight 1.820
-	item osd.43 weight 1.820
-	item osd.44 weight 1.820
-	item osd.45 weight 2.730
-	item osd.46 weight 1.820
-	item osd.47 weight 2.730
-	item osd.48 weight 2.730
-	item osd.49 weight 2.730
-	item osd.50 weight 2.730
-	item osd.51 weight 2.730
-	item osd.52 weight 2.730
-	item osd.53 weight 2.730
-	item osd.54 weight 2.730
-	item osd.55 weight 2.730
-	item osd.56 weight 2.730
-	item osd.57 weight 2.730
-	item osd.58 weight 2.730
-	item osd.59 weight 2.730
-}
-host disk-ceph-04 {
-	id -4		# do not change unnecessarily
-	# weight 67.340
-	alg straw2
-	hash 0	# rjenkins1
-	item osd.60 weight 1.820
-	item osd.61 weight 1.820
-	item osd.62 weight 1.820
-	item osd.63 weight 1.820
-	item osd.64 weight 1.820
-	item osd.65 weight 1.820
-	item osd.66 weight 1.820
-	item osd.67 weight 1.820
-	item osd.68 weight 1.820
-	item osd.69 weight 1.820
-	item osd.70 weight 1.820
-	item osd.71 weight 1.820
-	item osd.72 weight 1.820
-	item osd.73 weight 1.820
-	item osd.74 weight 1.820
-	item osd.75 weight 2.730
-	item osd.76 weight 1.820
-	item osd.77 weight 2.730
-	item osd.78 weight 2.730
-	item osd.79 weight 2.730
-	item osd.80 weight 2.730
-	item osd.81 weight 2.730
-	item osd.82 weight 2.730
-	item osd.83 weight 2.730
-	item osd.84 weight 2.730
-	item osd.85 weight 2.730
-	item osd.86 weight 2.730
-	item osd.87 weight 2.730
-	item osd.88 weight 2.730
-	item osd.89 weight 2.730
-}
 host disk-ceph-03 {
 	id -5		# do not change unnecessarily
 	# weight 67.340
@@ -418,74 +343,287 @@ host disk-ceph-01 {
 	item osd.178 weight 2.730
 	item osd.179 weight 2.730
 }
-
 rack disk-sub-x3 {
-
-    id -1000
-    alg straw2
-    hash 0
-    item disk-ceph-03 weight 67.340
-    item disk-ceph-02 weight 67.340
-    item disk-ceph-01 weight 67.340
+	id -1000		# do not change unnecessarily
+	# weight 202.020
+	alg straw2
+	hash 0	# rjenkins1
+	item disk-ceph-03 weight 67.340
+	item disk-ceph-02 weight 67.340
+	item disk-ceph-01 weight 67.340
 }
-
-rack disk-gwdg-s6 {
-
-    id -1001
-    alg straw2
-    hash 0
-    item disk-ceph-06 weight 67.340
-    item disk-ceph-05 weight 67.340
-    item disk-ceph-04 weight 67.340
-}
-
-
 datacenter disk-sub {
-  
-    id -2000
-    alg straw2
-    hash 0
-    item disk-sub-x3 weight 202.020
+	id -2000		# do not change unnecessarily
+	# weight 202.020
+	alg straw2
+	hash 0	# rjenkins1
+	item disk-sub-x3 weight 202.020
 }
-
+host disk-ceph-06 {
+	id -2		# do not change unnecessarily
+	# weight 67.340
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.0 weight 1.820
+	item osd.1 weight 1.820
+	item osd.2 weight 1.820
+	item osd.3 weight 1.820
+	item osd.4 weight 1.820
+	item osd.5 weight 1.820
+	item osd.6 weight 1.820
+	item osd.7 weight 1.820
+	item osd.8 weight 1.820
+	item osd.9 weight 1.820
+	item osd.10 weight 1.820
+	item osd.11 weight 1.820
+	item osd.12 weight 1.820
+	item osd.13 weight 1.820
+	item osd.14 weight 1.820
+	item osd.15 weight 2.730
+	item osd.16 weight 1.820
+	item osd.17 weight 2.730
+	item osd.18 weight 2.730
+	item osd.19 weight 2.730
+	item osd.20 weight 2.730
+	item osd.21 weight 2.730
+	item osd.22 weight 2.730
+	item osd.23 weight 2.730
+	item osd.24 weight 2.730
+	item osd.25 weight 2.730
+	item osd.26 weight 2.730
+	item osd.27 weight 2.730
+	item osd.28 weight 2.730
+	item osd.29 weight 2.730
+}
+host disk-ceph-05 {
+	id -3		# do not change unnecessarily
+	# weight 67.340
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.30 weight 1.820
+	item osd.31 weight 1.820
+	item osd.32 weight 1.820
+	item osd.33 weight 1.820
+	item osd.34 weight 1.820
+	item osd.35 weight 1.820
+	item osd.36 weight 1.820
+	item osd.37 weight 1.820
+	item osd.38 weight 1.820
+	item osd.39 weight 1.820
+	item osd.40 weight 1.820
+	item osd.41 weight 1.820
+	item osd.42 weight 1.820
+	item osd.43 weight 1.820
+	item osd.44 weight 1.820
+	item osd.45 weight 2.730
+	item osd.46 weight 1.820
+	item osd.47 weight 2.730
+	item osd.48 weight 2.730
+	item osd.49 weight 2.730
+	item osd.50 weight 2.730
+	item osd.51 weight 2.730
+	item osd.52 weight 2.730
+	item osd.53 weight 2.730
+	item osd.54 weight 2.730
+	item osd.55 weight 2.730
+	item osd.56 weight 2.730
+	item osd.57 weight 2.730
+	item osd.58 weight 2.730
+	item osd.59 weight 2.730
+}
+host disk-ceph-04 {
+	id -4		# do not change unnecessarily
+	# weight 67.340
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.60 weight 1.820
+	item osd.61 weight 1.820
+	item osd.62 weight 1.820
+	item osd.63 weight 1.820
+	item osd.64 weight 1.820
+	item osd.65 weight 1.820
+	item osd.66 weight 1.820
+	item osd.67 weight 1.820
+	item osd.68 weight 1.820
+	item osd.69 weight 1.820
+	item osd.70 weight 1.820
+	item osd.71 weight 1.820
+	item osd.72 weight 1.820
+	item osd.73 weight 1.820
+	item osd.74 weight 1.820
+	item osd.75 weight 2.730
+	item osd.76 weight 1.820
+	item osd.77 weight 2.730
+	item osd.78 weight 2.730
+	item osd.79 weight 2.730
+	item osd.80 weight 2.730
+	item osd.81 weight 2.730
+	item osd.82 weight 2.730
+	item osd.83 weight 2.730
+	item osd.84 weight 2.730
+	item osd.85 weight 2.730
+	item osd.86 weight 2.730
+	item osd.87 weight 2.730
+	item osd.88 weight 2.730
+	item osd.89 weight 2.730
+}
+rack disk-gwdg-s6 {
+	id -1001		# do not change unnecessarily
+	# weight 202.020
+	alg straw2
+	hash 0	# rjenkins1
+	item disk-ceph-06 weight 67.340
+	item disk-ceph-05 weight 67.340
+	item disk-ceph-04 weight 67.340
+}
 datacenter disk-gwdg {
-  
-    id -2001
-    alg straw2
-    hash 0
-    item disk-gwdg-s6 weight 202.020
+	id -2001		# do not change unnecessarily
+	# weight 202.020
+	alg straw2
+	hash 0	# rjenkins1
+	item disk-gwdg-s6 weight 202.020
 }
-
 root disk-root {
 	id -1		# do not change unnecessarily
-	# weight 404.039
+	# weight 404.040
 	alg straw
 	hash 0	# rjenkins1
-    item disk-sub weight 202.020
-    item disk-gwdg weight 202.020
+	item disk-sub weight 202.020
+	item disk-gwdg weight 202.020
+}
+
+# ssd based parallel hierarchy
+
+host ssd-ceph-06 {
+	id -8		# do not change unnecessarily
+	# weight 2.150
+	alg straw
+	hash 0	# rjenkins1
+	item osd.180 weight 0.430
+	item osd.181 weight 0.430
+	item osd.182 weight 0.430
+	item osd.183 weight 0.430
+	item osd.184 weight 0.430
+}
+host ssd-ceph-05 {
+	id -10		# do not change unnecessarily
+	# weight 2.150
+	alg straw
+	hash 0	# rjenkins1
+	item osd.185 weight 0.430
+	item osd.186 weight 0.430
+	item osd.187 weight 0.430
+	item osd.188 weight 0.430
+	item osd.189 weight 0.430
+}
+host ssd-ceph-04 {
+	id -11		# do not change unnecessarily
+	# weight 2.150
+	alg straw
+	hash 0	# rjenkins1
+	item osd.190 weight 0.430
+	item osd.191 weight 0.430
+	item osd.192 weight 0.430
+	item osd.193 weight 0.430
+	item osd.194 weight 0.430
+}
+host ssd-ceph-03 {
+	id -12		# do not change unnecessarily
+	# weight 2.150
+	alg straw
+	hash 0	# rjenkins1
+	item osd.195 weight 0.430
+	item osd.196 weight 0.430
+	item osd.197 weight 0.430
+	item osd.198 weight 0.430
+	item osd.199 weight 0.430
+}
+host ssd-ceph-02 {
+	id -13		# do not change unnecessarily
+	# weight 2.150
+	alg straw
+	hash 0	# rjenkins1
+	item osd.200 weight 0.430
+	item osd.201 weight 0.430
+	item osd.202 weight 0.430
+	item osd.203 weight 0.430
+	item osd.204 weight 0.430
+}
+host ssd-ceph-01 {
+	id -14		# do not change unnecessarily
+	# weight 2.150
+	alg straw
+	hash 0	# rjenkins1
+	item osd.205 weight 0.430
+	item osd.206 weight 0.430
+	item osd.207 weight 0.430
+	item osd.208 weight 0.430
+	item osd.209 weight 0.430
+}
+rack ssd-sub-x3 {
+    id -1002        # do not change unnecessarily
+    # weight 6.450
+    alg straw2
+    hash 0  # rjenkins1
+    item ssd-ceph-03 weight 2.150
+    item ssd-ceph-02 weight 2.150
+    item ssd-ceph-01 weight 2.150
+}
+datacenter ssd-sub {
+    id -2002        # do not change unnecessarily
+    # weight 6.450
+    alg straw2
+    hash 0  # rjenkins1
+    item ssd-sub-x3 weight 6.450
+}
+rack ssd-gwdg-s6 {
+    id -1003        # do not change unnecessarily
+    # weight 6.450
+    alg straw2
+    hash 0  # rjenkins1
+    item ssd-ceph-06 weight 2.150
+    item ssd-ceph-05 weight 2.150
+    item ssd-ceph-04 weight 2.150
+}
+datacenter ssd-gwdg {
+    id -2003        # do not change unnecessarily
+    # weight 6.450
+    alg straw2
+    hash 0  # rjenkins1
+    item ssd-gwdg-s6 weight 6.450
+}
+root ssd-root {
+    id -3001      # do not change unnecessarily
+    # weight 12.900
+    alg straw
+    hash 0  # rjenkins1
+    item ssd-sub weight 6.450
+    item ssd-gwdg weight 6.450
 }
 
 # rules
-#rule replicated_ruleset {
-#	ruleset 0
-#	type replicated
-#	min_size 1
-#	max_size 10
-#	step take disk-root
-#	step chooseleaf firstn 0 type host
-#	step emit
-#}
-
 rule disk-replicated {
-  ruleset 0
-  type replicated
-  min_size 1
-  max_size 10
-  step take disk-root
-  step choose firstn 2 type datacenter
-  step choose firstn 1 type rack
-  step chooseleaf firstn 2 type host
-  step emit
+	ruleset 0
+	type replicated
+	min_size 1
+	max_size 10
+	step take disk-root
+	step choose firstn 2 type datacenter
+	step choose firstn 1 type rack
+	step chooseleaf firstn 2 type host
+	step emit
+}
+
+rule ssd-replicated {
+    ruleset 1
+    type replicated
+    min_size 1
+    max_size 10
+    step take ssd-root
+    step choose firstn 2 type datacenter
+    step choose firstn 1 type rack
+    step chooseleaf firstn 2 type host
+    step emit
 }
 
 # end crush map
